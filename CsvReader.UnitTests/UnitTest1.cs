@@ -40,7 +40,6 @@ namespace CsvReader.UnitTests
         Assert.AreEqual("123", result[0][2]);
       });
     }
-
     [TestMethod]
     public void ParseDataWithDelimiter()
     {
@@ -57,7 +56,6 @@ namespace CsvReader.UnitTests
         Assert.AreEqual("123", result[0][2]);
       });
     }
-
     [TestMethod]
     public void ParseDataWithTextQualifier()
     {
@@ -67,6 +65,71 @@ namespace CsvReader.UnitTests
       ManageTempFile(filePath, CSV_CONTENT, () =>
       {
         var reader = new CsvReader2(",", "\"");
+        var result = reader.Parse(filePath).ToList();
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual("test", result[0][0]);
+        Assert.AreEqual("d\"ata", result[0][1]);
+        Assert.AreEqual("123", result[0][2]);
+      });
+    }
+
+    [TestMethod]
+    public void Parse10NormalDataEnd()
+    {
+      const string CSV_CONTENT = @"test,""data"",123";
+      var filePath = GetUniqueFilePath();
+
+      ManageTempFile(filePath, CSV_CONTENT, () =>
+      {
+        var reader = new CsvReader10(",", "\"");
+        var result = reader.Parse(filePath).ToList();
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual("test", result[0][0]);
+        Assert.AreEqual("data", result[0][1]);
+        Assert.AreEqual("123", result[0][2]);
+      });
+    }
+    [TestMethod]
+    public void Parse10NormalTextDataEnd()
+    {
+      const string CSV_CONTENT = @"test,""data"",""123""";
+      var filePath = GetUniqueFilePath();
+
+      ManageTempFile(filePath, CSV_CONTENT, () =>
+      {
+        var reader = new CsvReader10(",", "\"");
+        var result = reader.Parse(filePath).ToList();
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual("test", result[0][0]);
+        Assert.AreEqual("data", result[0][1]);
+        Assert.AreEqual("123", result[0][2]);
+      });
+    }
+    [TestMethod]
+    public void Parse10DataWithDelimiter()
+    {
+      const string CSV_CONTENT = @"test,""d,ata"",123";
+      var filePath = GetUniqueFilePath();
+
+      ManageTempFile(filePath, CSV_CONTENT, () =>
+      {
+        var reader = new CsvReader10(",", "\"");
+        var result = reader.Parse(filePath).ToList();
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual("test", result[0][0]);
+        Assert.AreEqual("d,ata", result[0][1]);
+        Assert.AreEqual("123", result[0][2]);
+      });
+    }
+    [TestMethod]
+    public void Parse10DataWithTextQualifier()
+    {
+      const string CSV_CONTENT = "test,\"d\"\"ata\",123";
+      var filePath = GetUniqueFilePath();
+
+      ManageTempFile(filePath, CSV_CONTENT, () =>
+      {
+        var reader = new CsvReader10(",", "\"");
         var result = reader.Parse(filePath).ToList();
         Assert.AreEqual(1, result.Count);
         Assert.AreEqual("test", result[0][0]);

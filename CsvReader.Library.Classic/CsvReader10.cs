@@ -22,6 +22,7 @@ namespace System.IO
       DataDoneRowComplete,
       TextDataEscape,
       EndRowCheck,
+      EndOfFile,
     }
 
     #region Members
@@ -81,14 +82,14 @@ namespace System.IO
                 }
                 if (currentChar == '\0')
                 {
-                  yield break;
+                  goto case ReaderState.EndOfFile;
                 }
                 else
                 {
                   readerState = ReaderState.Data;
+                  goto case ReaderState.Data;
                 }
               }
-              break;
             case ReaderState.Data:
               {
                 var currentChar = fileCharChunk[chunkIndex];
@@ -130,8 +131,7 @@ namespace System.IO
 
                 if (currentChar == '\0')
                 {
-                  readerState = ReaderState.DataDoneRowComplete;
-                  break;
+                  goto case ReaderState.EndOfFile;
                 }
 
                 chunkIndex++;
@@ -215,8 +215,7 @@ namespace System.IO
 
                   if (currentChar == '\0')
                   {
-                    readerState = ReaderState.DataDoneRowComplete;
-                    break;
+                    goto case ReaderState.EndOfFile;
                   }
 
                   throw new InvalidDataException();
@@ -241,18 +240,22 @@ namespace System.IO
               {
                 resultList.Add(dataResult.ToString());
                 dataResult.Length = 0;
-                readerState = ReaderState.UndeterminedData;
+                goto case ReaderState.UndeterminedData;
               }
-              break;
             case ReaderState.DataDoneRowComplete:
               {
                 resultList.Add(dataResult.ToString());
                 dataResult.Length = 0;
-                readerState = ReaderState.UndeterminedData;
                 yield return resultList;
                 resultList = new List<string>();
+                goto case ReaderState.UndeterminedData;
               }
-              break;
+            case ReaderState.EndOfFile:
+              {
+                resultList.Add(dataResult.ToString());
+                yield return resultList;
+                yield break;
+              }
           }
         }
       }
