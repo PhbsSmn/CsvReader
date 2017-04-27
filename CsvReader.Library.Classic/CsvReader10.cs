@@ -16,13 +16,12 @@ namespace System.IO
     {
       UndeterminedData,
       Data,
-      DataCarriageReturn,
       TextData,
-      DataDone,
-      DataDoneRowComplete,
+      DataCarriageReturn,
       TextDataEscape,
-      EndRowCheck,
-      EndOfFile,
+      MultiCharDelimiter,
+      MultiCharTextDelimiter,
+      MultiCharEndOfRowMarker,
     }
 
     #region Members
@@ -64,200 +63,139 @@ namespace System.IO
       var resultList = new List<string>();
       var readerState = ReaderState.UndeterminedData;
       var dataResult = new StringBuilder();
-
+      var currentMultiCharDelimiterIndex = 0;
+      var currentMultiCharEndOfRowMarkerIndex = 0;
       foreach (var fileCharChunk in FileToCharChunks(filePath))
       {
-        for (var chunkIndex = 0; chunkIndex < fileCharChunk.Length;)
+        for (var chunkIndex = 0; chunkIndex < fileCharChunk.Length; chunkIndex++)
         {
+          var currentChar = fileCharChunk[chunkIndex];
+
           switch (readerState)
           {
-            case ReaderState.UndeterminedData:
+            case ReaderState.UndeterminedData: // case done
+              if (_textQualifier[0].CompareTo(currentChar) == 0) { readerState = ReaderState.TextData; continue; }
+              else { readerState = ReaderState.Data; goto case ReaderState.Data; }
+            case ReaderState.Data: // multichar endline missing
+              if (_endOfRowMarkers == null)
               {
-                var currentChar = fileCharChunk[chunkIndex];
-                if (_textQualifier[0].CompareTo(currentChar) == 0)
-                {
-                  chunkIndex++;
-                  readerState = ReaderState.TextData;
-                  break;
-                }
-                if (currentChar == '\0')
-                {
-                  goto case ReaderState.EndOfFile;
-                }
-                else
-                {
-                  readerState = ReaderState.Data;
-                  goto case ReaderState.Data;
-                }
+                if (currentChar.CompareTo('\r') == 0) { readerState = ReaderState.DataCarriageReturn; continue; }
+                if (currentChar.CompareTo('\n') == 0) { goto DataDoneRowComplete; }
               }
-            case ReaderState.Data:
+              else
               {
-                var currentChar = fileCharChunk[chunkIndex];
-                if (_endOfRowMarkers == null)
-                {
-                  if (currentChar.CompareTo('\n') == 0)
-                  {
-                    chunkIndex++;
-                    readerState = ReaderState.DataDoneRowComplete;
-                    break;
-                  }
+                if (currentChar.CompareTo(_endOfRowMarkers[0]) == 0) { goto CustomEndofRowMarkerHandling; }
+              }
 
-                  if (currentChar.CompareTo('\r') == 0)
-                  {
-                    chunkIndex++;
-                    readerState = ReaderState.DataCarriageReturn;
-                    break;
-                  }
+              if (currentChar.CompareTo(_delimiter[0]) == 0) { goto DelimiterHandling; }
 
-                }
+              dataResult.Append(currentChar);
+              continue;
+            case ReaderState.TextData: // multichar textqualifier missing
+              if (currentChar.CompareTo(_textQualifier[0]) == 0)
+              {
+                if (_textQualifier.Length == 1) { readerState = ReaderState.TextDataEscape; continue; }
                 else
                 {
                   throw new NotImplementedException();
                 }
-
-                if (currentChar.CompareTo(_delimiter[0]) == 0)
-                {
-                  if (_delimiter.Length == 1)
-                  {
-                    chunkIndex++;
-                    readerState = ReaderState.DataDone;
-                    break;
-                  }
-                  else
-                  {
-                    throw new NotImplementedException();
-                  }
-                }
-
-                if (currentChar == '\0')
-                {
-                  goto case ReaderState.EndOfFile;
-                }
-
-                chunkIndex++;
-                dataResult.Append(currentChar);
               }
-              break;
-            case ReaderState.TextData:
-              {
-                var currentChar = fileCharChunk[chunkIndex];
-                if (currentChar.CompareTo(_textQualifier[0]) == 0)
-                {
-                  if (_textQualifier.Length == 1)
-                  {
-                    chunkIndex++;
-                    readerState = ReaderState.TextDataEscape;
-                    break;
-                  }
-                  else
-                  {
-                    throw new NotImplementedException();
-                  }
-                }
 
-                chunkIndex++;
-                dataResult.Append(currentChar);
-              }
-              break;
-            case ReaderState.TextDataEscape:
+              dataResult.Append(currentChar);
+              continue;
+            case ReaderState.TextDataEscape: // multichar endline & multichar textqualifier missing
+              if (currentChar.CompareTo(_textQualifier[0]) == 0)
               {
-                var currentChar = fileCharChunk[chunkIndex];
-                if (currentChar.CompareTo(_textQualifier[0]) == 0)
+                if (_textQualifier.Length == 1) { dataResult.Append(currentChar); readerState = ReaderState.TextData; continue; }
+                else
                 {
-                  if (_textQualifier.Length == 1)
-                  {
-                    chunkIndex++;
-                    dataResult.Append(currentChar);
-                    readerState = ReaderState.TextData;
-                  }
-                  else
-                  {
-                    throw new NotImplementedException();
-                  }
+                  throw new NotImplementedException();
+                }
+              }
+              else
+              {
+                if (currentChar.CompareTo(_delimiter[0]) == 0) { goto DelimiterHandling; }
+
+                if (_endOfRowMarkers == null)
+                {
+                  if (currentChar.CompareTo('\r') == 0) { readerState = ReaderState.DataCarriageReturn; continue; }
+                  if (currentChar.CompareTo('\n') == 0) { goto DataDoneRowComplete; }
                 }
                 else
                 {
-                  if (currentChar.CompareTo(_delimiter[0]) == 0)
-                  {
-                    if (_delimiter.Length == 1)
-                    {
-                      chunkIndex++;
-                      readerState = ReaderState.DataDone;
-                      break;
-                    }
-                    else
-                    {
-                      throw new NotImplementedException();
-                    }
-                  }
-
-                  if (_endOfRowMarkers == null)
-                  {
-                    if (currentChar.CompareTo('\n') == 0)
-                    {
-                      chunkIndex++;
-                      readerState = ReaderState.DataDoneRowComplete;
-                      break;
-                    }
-
-                    if (currentChar.CompareTo('\r') == 0)
-                    {
-                      chunkIndex++;
-                      readerState = ReaderState.DataCarriageReturn;
-                      break;
-                    }
-
-                  }
-                  else
-                  {
-                    throw new NotImplementedException();
-                  }
-
-                  if (currentChar == '\0')
-                  {
-                    goto case ReaderState.EndOfFile;
-                  }
-
-                  throw new InvalidDataException();
+                  if (currentChar.CompareTo(_endOfRowMarkers[0]) == 0) { goto CustomEndofRowMarkerHandling; }
                 }
+
+                throw new InvalidDataException();
               }
-              break;
-            case ReaderState.DataCarriageReturn:
+            case ReaderState.DataCarriageReturn: // Case done
               {
-                var currentChar = fileCharChunk[chunkIndex];
-                if (currentChar.CompareTo('\n') == 0)
-                {
-                  chunkIndex++;
-                  readerState = ReaderState.DataDoneRowComplete;
-                }
-                else
-                {
-                  throw new InvalidDataException();
-                }
+                if (currentChar.CompareTo('\n') == 0) { goto DataDoneRowComplete; }
+                else { throw new InvalidDataException(); }
               }
-              break;
-            case ReaderState.DataDone:
+            case ReaderState.MultiCharDelimiter:
+            case ReaderState.MultiCharTextDelimiter:
+              if (currentChar.CompareTo(_delimiter[currentMultiCharDelimiterIndex]) == 0)
               {
-                resultList.Add(dataResult.ToString());
-                dataResult.Length = 0;
-                goto case ReaderState.UndeterminedData;
+                if (_delimiter.Length == ++currentMultiCharDelimiterIndex) { goto DataDone; }
+                continue;
               }
-            case ReaderState.DataDoneRowComplete:
+              else
               {
-                resultList.Add(dataResult.ToString());
-                dataResult.Length = 0;
-                yield return resultList;
-                resultList = new List<string>();
-                goto case ReaderState.UndeterminedData;
+                dataResult.Append(_delimiter.Take(currentMultiCharDelimiterIndex).ToArray());
+                dataResult.Append(currentChar);
+                if (readerState == ReaderState.MultiCharDelimiter) { readerState = ReaderState.Data; }
+                else { readerState = ReaderState.TextData; }
+                continue;
               }
-            case ReaderState.EndOfFile:
+            case ReaderState.MultiCharEndOfRowMarker:
+              if (currentChar.CompareTo(_endOfRowMarkers[currentMultiCharEndOfRowMarkerIndex]) == 0)
               {
-                resultList.Add(dataResult.ToString());
-                yield return resultList;
-                yield break;
+                if (_endOfRowMarkers.Length == ++currentMultiCharEndOfRowMarkerIndex) { goto DataDoneRowComplete; }
               }
+              throw new InvalidDataException();
           }
+
+          DataDone:
+          resultList.Add(dataResult.ToString());
+          dataResult.Length = 0;
+          readerState = ReaderState.UndeterminedData;
+          continue;
+
+          DataDoneRowComplete:
+          resultList.Add(dataResult.ToString());
+          dataResult.Length = 0;
+          yield return resultList;
+          resultList = new List<string>();
+          readerState = ReaderState.UndeterminedData;
+          continue;
+
+          DelimiterHandling:
+          if (_delimiter.Length == 1) { goto DataDone; }
+          else
+          {
+            currentMultiCharDelimiterIndex = 1;
+            if (readerState == ReaderState.Data)
+            {
+              readerState = ReaderState.MultiCharDelimiter;
+            }
+            else
+            {
+              readerState = ReaderState.MultiCharTextDelimiter;
+            }
+            continue;
+          }
+
+          CustomEndofRowMarkerHandling:
+          if (_endOfRowMarkers.Length == 1) { goto DataDoneRowComplete; }
+          else { currentMultiCharEndOfRowMarkerIndex = 1; readerState = ReaderState.MultiCharEndOfRowMarker; continue; }
         }
+      }
+
+      if (dataResult.Length != 0) { resultList.Add(dataResult.ToString()); }
+      if (resultList.Count != 0)
+      {
+        yield return resultList;
       }
     }
     #endregion
@@ -275,32 +213,24 @@ namespace System.IO
           {
             char[] fileContents;
             int charsRead;
+            var readingFile = true;
             do
             {
               fileContents = new char[_bufferSize];
               charsRead = streamReader.Read(fileContents, 0, _bufferSize);
-              yield return fileContents;
-            } while (charsRead > 0);
+              if (charsRead == _bufferSize)
+              {
+                yield return fileContents;
+              }
+              else
+              {
+                readingFile = false;
+                yield return fileContents.Take(charsRead).ToArray();
+              }
+            } while (readingFile);
           }
         }
       }
-    }
-    #endregion
-
-    #region Data
-    private bool IsDataMarker(IEnumerable<char> fileChars, char[] marker)
-    {
-      var index = 0;
-      foreach (var fileChar in fileChars)
-      {
-        if (!fileChar.Equals(marker[index]))
-        {
-          return false;
-        }
-        index++;
-      }
-
-      return true;
     }
     #endregion
   }

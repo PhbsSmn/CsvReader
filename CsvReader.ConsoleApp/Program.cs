@@ -21,7 +21,7 @@ namespace CsvReader.ConsoleApp
       var csvReader2TotalSeconds = 0d;
       var csvReader10TotalSeconds = 0d;
 
-      for (int i = 0; i < 10; i++)
+      for (int i = 0; i < 50; i++)
       {
         var csvReader2 = new CsvReader2();
         var swCsvReader2 = new Stopwatch();

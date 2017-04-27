@@ -122,6 +122,72 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
+    public void Parse10DataWithMultiDelimiter()
+    {
+      const string CSV_CONTENT = @"test,@,""d,@,ata"",@,123";
+      var filePath = GetUniqueFilePath();
+
+      ManageTempFile(filePath, CSV_CONTENT, () =>
+      {
+        var reader = new CsvReader10(",@,", "\"");
+        var result = reader.Parse(filePath).ToList();
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual("test", result[0][0]);
+        Assert.AreEqual("d,@,ata", result[0][1]);
+        Assert.AreEqual("123", result[0][2]);
+      });
+    }
+    [TestMethod]
+    public void Parse10DataWithMultiDelimiter2()
+    {
+      const string CSV_CONTENT = @"test,@d,@,""d,@,ata"",@,123";
+      var filePath = GetUniqueFilePath();
+
+      ManageTempFile(filePath, CSV_CONTENT, () =>
+      {
+        var reader = new CsvReader10(",@,", "\"");
+        var result = reader.Parse(filePath).ToList();
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual("test,@d", result[0][0]);
+        Assert.AreEqual("d,@,ata", result[0][1]);
+        Assert.AreEqual("123", result[0][2]);
+      });
+    }
+    [TestMethod]
+    public void Parse10DataEndCustomEndOfRowMarker()
+    {
+      const string CSV_CONTENT = @"test,""data"",123|row2";
+      var filePath = GetUniqueFilePath();
+
+      ManageTempFile(filePath, CSV_CONTENT, () =>
+      {
+        var reader = new CsvReader10(",", "\"", "|");
+        var result = reader.Parse(filePath).ToList();
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual("test", result[0][0]);
+        Assert.AreEqual("data", result[0][1]);
+        Assert.AreEqual("123", result[0][2]);
+        Assert.AreEqual("row2", result[1][0]);
+      });
+    }
+    [TestMethod]
+    public void Parse10TextDataEndCustomEndOfRowMarker()
+    {
+      const string CSV_CONTENT = @"test,""data"",""123""|row2";
+      var filePath = GetUniqueFilePath();
+
+      ManageTempFile(filePath, CSV_CONTENT, () =>
+      {
+        var reader = new CsvReader10(",", "\"", "|");
+        var result = reader.Parse(filePath).ToList();
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual("test", result[0][0]);
+        Assert.AreEqual("data", result[0][1]);
+        Assert.AreEqual("123", result[0][2]);
+        Assert.AreEqual("row2", result[1][0]);
+      });
+    }
+    [TestMethod]
     public void Parse10DataWithTextQualifier()
     {
       const string CSV_CONTENT = "test,\"d\"\"ata\",123";
