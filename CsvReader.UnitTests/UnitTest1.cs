@@ -9,7 +9,7 @@ namespace CsvReader.UnitTests
   public class UnitTest1
   {
     [TestMethod]
-    public void Parse10NormalDataEnd()
+    public void NormalDataEnd()
     {
       const string CSV_CONTENT = @"test,""data"",123";
       var filePath = GetUniqueFilePath();
@@ -25,7 +25,7 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
-    public void Parse10NormalTextDataEnd()
+    public void NormalTextDataEnd()
     {
       const string CSV_CONTENT = @"test,""data"",""123""";
       var filePath = GetUniqueFilePath();
@@ -41,7 +41,7 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
-    public void Parse10DataWithDelimiter()
+    public void DataWithDelimiter()
     {
       const string CSV_CONTENT = @"test,""d,ata"",123";
       var filePath = GetUniqueFilePath();
@@ -57,14 +57,14 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
-    public void Parse10DataWithMultiDelimiter()
+    public void DataWithMultiDelimiter()
     {
       const string CSV_CONTENT = @"test,@,""d,@,ata"",@,123";
       var filePath = GetUniqueFilePath();
 
       ManageTempFile(filePath, CSV_CONTENT, () =>
       {
-        var reader = new System.IO.CsvReader(",@,", "\"");
+        var reader = new System.IO.CsvReader(delimiter: ",@,");
         var result = reader.Parse(filePath).ToList();
         Assert.AreEqual(1, result.Count);
         Assert.AreEqual("test", result[0][0]);
@@ -73,14 +73,14 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
-    public void Parse10DataWithMultiDelimiter2()
+    public void DataWithMultiDelimiter2()
     {
       const string CSV_CONTENT = @"test,@d,@,""d,@,ata"",@,123";
       var filePath = GetUniqueFilePath();
 
       ManageTempFile(filePath, CSV_CONTENT, () =>
       {
-        var reader = new System.IO.CsvReader(",@,", "\"");
+        var reader = new System.IO.CsvReader(delimiter: ",@,");
         var result = reader.Parse(filePath).ToList();
         Assert.AreEqual(1, result.Count);
         Assert.AreEqual("test,@d", result[0][0]);
@@ -89,14 +89,14 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
-    public void Parse10DataEndCustomEndOfRowMarker()
+    public void DataEndCustomEndOfRowMarker()
     {
       const string CSV_CONTENT = @"test,""data"",123|row2";
       var filePath = GetUniqueFilePath();
 
       ManageTempFile(filePath, CSV_CONTENT, () =>
       {
-        var reader = new System.IO.CsvReader(",", "\"", "|");
+        var reader = new System.IO.CsvReader(endOfRowMarker: "|");
         var result = reader.Parse(filePath).ToList();
         Assert.AreEqual(2, result.Count);
         Assert.AreEqual("test", result[0][0]);
@@ -106,14 +106,14 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
-    public void Parse10TextDataEndCustomEndOfRowMarker()
+    public void TextDataEndCustomEndOfRowMarker()
     {
       const string CSV_CONTENT = @"test,""data"",""123""|row2";
       var filePath = GetUniqueFilePath();
 
       ManageTempFile(filePath, CSV_CONTENT, () =>
       {
-        var reader = new System.IO.CsvReader(",", "\"", "|");
+        var reader = new System.IO.CsvReader(endOfRowMarker: "|");
         var result = reader.Parse(filePath).ToList();
         Assert.AreEqual(2, result.Count);
         Assert.AreEqual("test", result[0][0]);
@@ -123,14 +123,14 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
-    public void Parse10DataEndCustomMultiEndOfRowMarker()
+    public void DataEndCustomMultiEndOfRowMarker()
     {
       const string CSV_CONTENT = @"test,""data"",123|#row2";
       var filePath = GetUniqueFilePath();
 
       ManageTempFile(filePath, CSV_CONTENT, () =>
       {
-        var reader = new System.IO.CsvReader(",", "\"", "|#");
+        var reader = new System.IO.CsvReader(endOfRowMarker: "|#");
         var result = reader.Parse(filePath).ToList();
         Assert.AreEqual(2, result.Count);
         Assert.AreEqual("test", result[0][0]);
@@ -140,14 +140,14 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
-    public void Parse10DataEndCustomMultiEndOfRowMarker2()
+    public void DataEndCustomMultiEndOfRowMarker2()
     {
       const string CSV_CONTENT = @"test,""data"",12|3|#row2";
       var filePath = GetUniqueFilePath();
 
       ManageTempFile(filePath, CSV_CONTENT, () =>
       {
-        var reader = new System.IO.CsvReader(",", "\"", "|#");
+        var reader = new System.IO.CsvReader(endOfRowMarker: "|#");
         var result = reader.Parse(filePath).ToList();
         Assert.AreEqual(2, result.Count);
         Assert.AreEqual("test", result[0][0]);
@@ -157,14 +157,14 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
-    public void Parse10TextDataEndCustomMultiEndOfRowMarker()
+    public void TextDataEndCustomMultiEndOfRowMarker()
     {
       const string CSV_CONTENT = @"test,""data"",""123""|#row2";
       var filePath = GetUniqueFilePath();
 
       ManageTempFile(filePath, CSV_CONTENT, () =>
       {
-        var reader = new System.IO.CsvReader(",", "\"", "|#");
+        var reader = new System.IO.CsvReader(endOfRowMarker: "|#");
         var result = reader.Parse(filePath).ToList();
         Assert.AreEqual(2, result.Count);
         Assert.AreEqual("test", result[0][0]);
@@ -174,14 +174,14 @@ namespace CsvReader.UnitTests
       });
     }
     [TestMethod]
-    public void Parse10DataWithTextQualifier()
+    public void TextDataWithTextQualifier()
     {
       const string CSV_CONTENT = "test,\"d\"\"ata\",123";
       var filePath = GetUniqueFilePath();
 
       ManageTempFile(filePath, CSV_CONTENT, () =>
       {
-        var reader = new System.IO.CsvReader(",", "\"");
+        var reader = new System.IO.CsvReader();
         var result = reader.Parse(filePath).ToList();
         Assert.AreEqual(1, result.Count);
         Assert.AreEqual("test", result[0][0]);
@@ -189,7 +189,43 @@ namespace CsvReader.UnitTests
         Assert.AreEqual("123", result[0][2]);
       });
     }
+    [TestMethod]
+    public void TextDataWithMultiTextQualifier()
+    {
+      const string CSV_CONTENT = "test,\"@data\"@,123";
+      var filePath = GetUniqueFilePath();
 
+      ManageTempFile(filePath, CSV_CONTENT, () =>
+      {
+        var reader = new System.IO.CsvReader(textQualifier:"\"@");
+        var result = reader.Parse(filePath).ToList();
+        Assert.AreEqual(1, result.Count);
+        Assert.AreEqual("test", result[0][0]);
+        Assert.AreEqual("d\"ata", result[0][1]);
+        Assert.AreEqual("123", result[0][2]);
+      });
+    }
+    [TestMethod]
+    public void StartAt3Line()
+    {
+      const string CSV_CONTENT = @"
+
+col1,col2
+r1col1,r1col2";
+      var filePath = GetUniqueFilePath();
+
+      ManageTempFile(filePath, CSV_CONTENT, () =>
+      {
+        var reader = new System.IO.CsvReader(startAtLine: 2);
+        var result = reader.Parse(filePath).ToList();
+        Assert.AreEqual(2, result.Count);
+        Assert.AreEqual("col1", result[0][0]);
+        Assert.AreEqual("col2", result[0][1]);
+        Assert.AreEqual("r1col1", result[1][0]);
+        Assert.AreEqual("r1col2", result[1][1]);
+      });
+
+    }
 
     private static void ManageTempFile(string filePath, string content, Action action)
     {

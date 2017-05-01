@@ -30,6 +30,7 @@ namespace System.IO
     private readonly char[] _textQualifier;
     private readonly char[] _endOfRowMarkers;
     private readonly int _bufferSize;
+    private readonly int _startAtLine;
     #endregion
 
     #region Constructors
@@ -38,14 +39,15 @@ namespace System.IO
     /// </summary>
     /// <param name="delimiter">The char(s) to separate fields.</param>
     /// <param name="textQualifier">The char(s) to indicate a text field beginning and ending.</param>
-    /// <param name="endOfRowMarker">The char(s) to indicate an end of row. By default \n and \r\n will be checked unless overriden then these will be ignored.</param>
-    /// <param name="startLine">At which line the parser should start retrieving data.</param>
+    /// <param name="endOfRowMarker">The char(s) to indicate an end of row. By default \n and \r\n will be checked unless overriden.</param>
+    /// <param name="startAtLine">At which line the parser should start retrieving data.</param>
     /// <param name="bufferSize">The default amount of data read from file at once just large enough to just not end up in the LOH.</param>
-    public CsvReader(string delimiter = ",", string textQualifier = "\"", string endOfRowMarker = null, int startLine = 0, int bufferSize = 84998)
+    public CsvReader(string delimiter = ",", string textQualifier = "\"", string endOfRowMarker = null, int startAtLine = 0, int bufferSize = 84998)
     {
       _delimiter = delimiter.ToCharArray();
       _textQualifier = textQualifier.ToCharArray();
       _bufferSize = bufferSize;
+      _startAtLine = startAtLine;
 
       if (!string.IsNullOrEmpty(endOfRowMarker))
       {
@@ -62,6 +64,7 @@ namespace System.IO
     /// <returns>A formated string list</returns>
     public IEnumerable<List<string>> Parse(string filePath)
     {
+      var currentLine = 0;
       var resultList = new List<string>();
       var readerState = ReaderState.UndeterminedData;
       var dataResult = new StringBuilder();
@@ -78,7 +81,7 @@ namespace System.IO
             case ReaderState.UndeterminedData: // case done
               if (_textQualifier[0].CompareTo(currentChar) == 0) { readerState = ReaderState.TextData; continue; }
               else { readerState = ReaderState.Data; goto case ReaderState.Data; }
-            case ReaderState.Data: // multichar endline missing
+            case ReaderState.Data:
               if (_endOfRowMarkers == null)
               {
                 if (currentChar.CompareTo('\r') == 0) { readerState = ReaderState.DataCarriageReturn; continue; }
@@ -105,7 +108,7 @@ namespace System.IO
 
               dataResult.Append(currentChar);
               continue;
-            case ReaderState.TextDataEscape: // multichar endline & multichar textqualifier missing
+            case ReaderState.TextDataEscape: // multichar textqualifier missing
               if (currentChar.CompareTo(_textQualifier[0]) == 0)
               {
                 if (_textQualifier.Length == 1) { dataResult.Append(currentChar); readerState = ReaderState.TextData; continue; }
@@ -130,7 +133,7 @@ namespace System.IO
 
                 throw new InvalidDataException();
               }
-            case ReaderState.DataCarriageReturn: // Case done
+            case ReaderState.DataCarriageReturn:
               {
                 if (currentChar.CompareTo('\n') == 0) { goto DataDoneRowComplete; }
                 else { throw new InvalidDataException(); }
@@ -175,7 +178,15 @@ namespace System.IO
           DataDoneRowComplete:
           resultList.Add(dataResult.ToString());
           dataResult.Length = 0;
-          yield return resultList;
+          if (_startAtLine <= currentLine)
+          {
+            yield return resultList;
+          }
+          else
+          {
+            currentLine++;
+          }
+
           resultList = new List<string>();
           readerState = ReaderState.UndeterminedData;
           continue;
