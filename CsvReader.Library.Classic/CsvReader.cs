@@ -10,7 +10,7 @@ namespace System.IO
   /// <summary>
   /// A basic CSV reader, optimized for speed (re-visioned)
   /// </summary>
-  public class CsvReader10
+  public class CsvReader
   {
     enum ReaderState
     {
@@ -22,6 +22,7 @@ namespace System.IO
       MultiCharDelimiter,
       MultiCharTextDelimiter,
       MultiCharEndOfRowMarker,
+      MultiCharDataEndOfRowMarker,
     }
 
     #region Members
@@ -37,9 +38,10 @@ namespace System.IO
     /// </summary>
     /// <param name="delimiter">The char(s) to separate fields.</param>
     /// <param name="textQualifier">The char(s) to indicate a text field beginning and ending.</param>
-    /// <param name="endOfRowMarker">The char(s) to indicate an end of row. By default \n & \r\n will be checked unless overriden then these will be ignored.</param>
+    /// <param name="endOfRowMarker">The char(s) to indicate an end of row. By default \n and \r\n will be checked unless overriden then these will be ignored.</param>
     /// <param name="startLine">At which line the parser should start retrieving data.</param>
-    public CsvReader10(string delimiter = ",", string textQualifier = "\"", string endOfRowMarker = null, int startLine = 0, int bufferSize = 84998)
+    /// <param name="bufferSize">The default amount of data read from file at once just large enough to just not end up in the LOH.</param>
+    public CsvReader(string delimiter = ",", string textQualifier = "\"", string endOfRowMarker = null, int startLine = 0, int bufferSize = 84998)
     {
       _delimiter = delimiter.ToCharArray();
       _textQualifier = textQualifier.ToCharArray();
@@ -149,9 +151,17 @@ namespace System.IO
                 continue;
               }
             case ReaderState.MultiCharEndOfRowMarker:
+            case ReaderState.MultiCharDataEndOfRowMarker:
               if (currentChar.CompareTo(_endOfRowMarkers[currentMultiCharEndOfRowMarkerIndex]) == 0)
               {
                 if (_endOfRowMarkers.Length == ++currentMultiCharEndOfRowMarkerIndex) { goto DataDoneRowComplete; }
+              }
+              else if (readerState == ReaderState.MultiCharDataEndOfRowMarker)
+              {
+                dataResult.Append(_endOfRowMarkers.Take(currentMultiCharDelimiterIndex + 1).ToArray());
+                dataResult.Append(currentChar);
+                readerState = ReaderState.Data;
+                continue;
               }
               throw new InvalidDataException();
           }
@@ -188,7 +198,19 @@ namespace System.IO
 
           CustomEndofRowMarkerHandling:
           if (_endOfRowMarkers.Length == 1) { goto DataDoneRowComplete; }
-          else { currentMultiCharEndOfRowMarkerIndex = 1; readerState = ReaderState.MultiCharEndOfRowMarker; continue; }
+          else
+          {
+            currentMultiCharEndOfRowMarkerIndex = 1;
+            if (readerState == ReaderState.Data)
+            {
+              readerState = ReaderState.MultiCharDataEndOfRowMarker;
+            }
+            else
+            {
+              readerState = ReaderState.MultiCharEndOfRowMarker;
+            }
+            continue;
+          }
         }
       }
 
