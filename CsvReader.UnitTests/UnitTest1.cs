@@ -192,7 +192,7 @@ namespace CsvReader.UnitTests
     [TestMethod]
     public void TextDataWithMultiTextQualifier()
     {
-      const string CSV_CONTENT = "test,\"@data\"@,123";
+      const string CSV_CONTENT = "test,\"@d\"@\"@ata\"@,123";
       var filePath = GetUniqueFilePath();
 
       ManageTempFile(filePath, CSV_CONTENT, () =>
@@ -201,7 +201,7 @@ namespace CsvReader.UnitTests
         var result = reader.Parse(filePath).ToList();
         Assert.AreEqual(1, result.Count);
         Assert.AreEqual("test", result[0][0]);
-        Assert.AreEqual("d\"ata", result[0][1]);
+        Assert.AreEqual("d\"@ata", result[0][1]);
         Assert.AreEqual("123", result[0][2]);
       });
     }

@@ -1,9 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.IO;
+﻿using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace System.IO
 {
@@ -23,6 +20,9 @@ namespace System.IO
       MultiCharTextDelimiter,
       MultiCharEndOfRowMarker,
       MultiCharDataEndOfRowMarker,
+      MultiCharStartTextQualifier,
+      MultiCharTextQualifier,
+      MultiCharEscapeTextQualifier,
     }
 
     #region Members
@@ -39,7 +39,7 @@ namespace System.IO
     /// </summary>
     /// <param name="delimiter">The char(s) to separate fields.</param>
     /// <param name="textQualifier">The char(s) to indicate a text field beginning and ending.</param>
-    /// <param name="endOfRowMarker">The char(s) to indicate an end of row. By default \n and \r\n will be checked unless overriden.</param>
+    /// <param name="endOfRowMarker">The char(s) to indicate an end of row. By default \n and \r\n will be checked unless overridden.</param>
     /// <param name="startAtLine">At which line the parser should start retrieving data.</param>
     /// <param name="bufferSize">The default amount of data read from file at once just large enough to just not end up in the LOH.</param>
     public CsvReader(string delimiter = ",", string textQualifier = "\"", string endOfRowMarker = null, int startAtLine = 0, int bufferSize = 84998)
@@ -70,16 +70,30 @@ namespace System.IO
       var dataResult = new StringBuilder();
       var currentMultiCharDelimiterIndex = 0;
       var currentMultiCharEndOfRowMarkerIndex = 0;
+      var currentMultiCharTextQualifier = 0;
       foreach (var fileCharChunk in FileToCharChunks(filePath))
       {
+        // ReSharper disable once ForCanBeConvertedToForeach, suggestion was not done because of speed drop
         for (var chunkIndex = 0; chunkIndex < fileCharChunk.Length; chunkIndex++)
         {
           var currentChar = fileCharChunk[chunkIndex];
 
           switch (readerState)
           {
-            case ReaderState.UndeterminedData: // case done
-              if (_textQualifier[0].CompareTo(currentChar) == 0) { readerState = ReaderState.TextData; continue; }
+            case ReaderState.UndeterminedData:
+              if (_textQualifier[0].CompareTo(currentChar) == 0)
+              {
+                if (_textQualifier.Length == 1)
+                {
+                  readerState = ReaderState.TextData;
+                }
+                else
+                {
+                  currentMultiCharTextQualifier = 1;
+                  readerState = ReaderState.MultiCharStartTextQualifier;
+                }
+                continue;
+              }
               else { readerState = ReaderState.Data; goto case ReaderState.Data; }
             case ReaderState.Data:
               if (_endOfRowMarkers == null)
@@ -96,25 +110,27 @@ namespace System.IO
 
               dataResult.Append(currentChar);
               continue;
-            case ReaderState.TextData: // multichar textqualifier missing
+            case ReaderState.TextData:
               if (currentChar.CompareTo(_textQualifier[0]) == 0)
               {
                 if (_textQualifier.Length == 1) { readerState = ReaderState.TextDataEscape; continue; }
                 else
                 {
-                  throw new NotImplementedException();
+                  currentMultiCharTextQualifier = 1;
+                  readerState = ReaderState.MultiCharTextQualifier; continue;
                 }
               }
 
               dataResult.Append(currentChar);
               continue;
-            case ReaderState.TextDataEscape: // multichar textqualifier missing
+            case ReaderState.TextDataEscape:
               if (currentChar.CompareTo(_textQualifier[0]) == 0)
               {
                 if (_textQualifier.Length == 1) { dataResult.Append(currentChar); readerState = ReaderState.TextData; continue; }
                 else
                 {
-                  throw new NotImplementedException();
+                  currentMultiCharTextQualifier = 1;
+                  readerState = ReaderState.MultiCharEscapeTextQualifier; continue;
                 }
               }
               else
@@ -136,7 +152,7 @@ namespace System.IO
             case ReaderState.DataCarriageReturn:
               {
                 if (currentChar.CompareTo('\n') == 0) { goto DataDoneRowComplete; }
-                else { throw new InvalidDataException(); }
+                throw new InvalidDataException();
               }
             case ReaderState.MultiCharDelimiter:
             case ReaderState.MultiCharTextDelimiter:
@@ -145,16 +161,16 @@ namespace System.IO
                 if (_delimiter.Length == ++currentMultiCharDelimiterIndex) { goto DataDone; }
                 continue;
               }
-              else
-              {
-                dataResult.Append(_delimiter.Take(currentMultiCharDelimiterIndex).ToArray());
-                dataResult.Append(currentChar);
-                if (readerState == ReaderState.MultiCharDelimiter) { readerState = ReaderState.Data; }
-                else { readerState = ReaderState.TextData; }
-                continue;
-              }
+
+              dataResult.Append(_delimiter.Take(currentMultiCharDelimiterIndex).ToArray());
+              dataResult.Append(currentChar);
+              if (readerState == ReaderState.MultiCharDelimiter) { readerState = ReaderState.Data; }
+              else { readerState = ReaderState.TextData; }
+              continue;
+
             case ReaderState.MultiCharEndOfRowMarker:
             case ReaderState.MultiCharDataEndOfRowMarker:
+              // ReSharper disable once PossibleNullReferenceException
               if (currentChar.CompareTo(_endOfRowMarkers[currentMultiCharEndOfRowMarkerIndex]) == 0)
               {
                 if (_endOfRowMarkers.Length == ++currentMultiCharEndOfRowMarkerIndex) { goto DataDoneRowComplete; }
@@ -167,34 +183,76 @@ namespace System.IO
                 continue;
               }
               throw new InvalidDataException();
+            case ReaderState.MultiCharStartTextQualifier:
+              if (currentChar.CompareTo(_textQualifier[currentMultiCharTextQualifier]) == 0)
+              {
+                if (_textQualifier.Length == ++currentMultiCharTextQualifier)
+                {
+                  readerState = ReaderState.TextData;
+                }
+              }
+              else
+              {
+                dataResult.Append(_textQualifier.Take(currentMultiCharTextQualifier + 1).ToArray());
+                readerState = ReaderState.Data;
+              }
+              continue;
+            case ReaderState.MultiCharTextQualifier:
+              if (currentChar.CompareTo(_textQualifier[currentMultiCharTextQualifier]) == 0)
+              {
+                if (_textQualifier.Length == ++currentMultiCharTextQualifier)
+                {
+                  readerState = ReaderState.TextDataEscape;
+                }
+              }
+              else
+              {
+                dataResult.Append(_textQualifier.Take(currentMultiCharTextQualifier + 1).ToArray());
+                readerState = ReaderState.TextData;
+              }
+              continue;
+            case ReaderState.MultiCharEscapeTextQualifier:
+              if (currentChar.CompareTo(_textQualifier[currentMultiCharTextQualifier]) == 0)
+              {
+                if (_textQualifier.Length == ++currentMultiCharTextQualifier)
+                {
+                  dataResult.Append(_textQualifier.ToArray());
+                  readerState = ReaderState.TextData;
+                }
+                continue;
+              }
+              throw new InvalidDataException();
           }
 
           DataDone:
-          resultList.Add(dataResult.ToString());
-          dataResult.Length = 0;
-          readerState = ReaderState.UndeterminedData;
-          continue;
+          {
+            resultList.Add(dataResult.ToString());
+            dataResult.Length = 0;
+            readerState = ReaderState.UndeterminedData;
+            continue;
+          }
 
           DataDoneRowComplete:
-          resultList.Add(dataResult.ToString());
-          dataResult.Length = 0;
-          if (_startAtLine <= currentLine)
           {
-            yield return resultList;
-          }
-          else
-          {
-            currentLine++;
-          }
+            resultList.Add(dataResult.ToString());
+            dataResult.Length = 0;
+            if (_startAtLine <= currentLine)
+            {
+              yield return resultList;
+            }
+            else
+            {
+              currentLine++;
+            }
 
-          resultList = new List<string>();
-          readerState = ReaderState.UndeterminedData;
-          continue;
+            resultList = new List<string>();
+            readerState = ReaderState.UndeterminedData;
+            continue;
+          }
 
           DelimiterHandling:
-          if (_delimiter.Length == 1) { goto DataDone; }
-          else
           {
+            if (_delimiter.Length == 1) { goto DataDone; }
             currentMultiCharDelimiterIndex = 1;
             if (readerState == ReaderState.Data)
             {
@@ -208,9 +266,9 @@ namespace System.IO
           }
 
           CustomEndofRowMarkerHandling:
-          if (_endOfRowMarkers.Length == 1) { goto DataDoneRowComplete; }
-          else
           {
+            if (_endOfRowMarkers.Length == 1) { goto DataDoneRowComplete; }
+
             currentMultiCharEndOfRowMarkerIndex = 1;
             if (readerState == ReaderState.Data)
             {
@@ -220,6 +278,7 @@ namespace System.IO
             {
               readerState = ReaderState.MultiCharEndOfRowMarker;
             }
+            // ReSharper disable once RedundantJumpStatement
             continue;
           }
         }
@@ -244,13 +303,11 @@ namespace System.IO
         {
           using (var streamReader = new StreamReader(fileStream))
           {
-            char[] fileContents;
-            int charsRead;
             var readingFile = true;
             do
             {
-              fileContents = new char[_bufferSize];
-              charsRead = streamReader.Read(fileContents, 0, _bufferSize);
+              var fileContents = new char[_bufferSize];
+              var charsRead = streamReader.Read(fileContents, 0, _bufferSize);
               if (charsRead == _bufferSize)
               {
                 yield return fileContents;
